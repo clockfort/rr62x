@@ -1,0 +1,161 @@
+# $Id: Makefile.def,v 1.28 2009/09/23 07:34:19 wsw Exp $
+#
+# Default makefile for Linux driver
+# Copyright (C) 2004-2005 HighPoint Technologies, Inc. All Rights Reserved.
+# History:
+#   2004-12-14 gmm initial code
+#
+# Make options:
+#
+#   DEBUG=1           - enable debug
+#   V=1               - verbose output
+#   CROSS_COMPILE=    - cross compiler prefix
+#   ARCH=             - target arch
+#   KERNELDIR=        - kernel headers dir, to build modules
+#
+
+HPT_ROOT := $(shell (cd $(HPT_ROOT); pwd))
+
+ARCH := $(shell uname -m)
+
+CC := gcc
+CROSS_COMPILE :=
+
+C_INCLUDES := -I$(HPT_ROOT)/inc -I$(HPT_ROOT)/inc/linux
+
+C_DEFINES := -DLINUX -D_LINUX_ -D__KERNEL__=1 $(C_DEFINES)
+
+DEBUG ?= 0
+ifeq ($(DEBUG),1)
+C_DEFINES += -DDBG=1
+else
+C_DEFINES += -DDBG=0
+endif
+
+# This is only for patch script to make the Makefile include the proper defined C_DEFINES.
+# In patching mode, we can not add -DMODVERSIONS -DMODULES, or will make confusion while 
+# the user compiles our driver into the kernel image. Also we should determine the ARCH
+# while compile the kernel module and add proper EXTRA_CFLAGS.
+C_DEFINE := $(C_DEFINES)
+
+SHARED_HEADERS := \
+		$(HPT_ROOT)/inc/linux/osm.h \
+		$(HPT_ROOT)/inc/ldm.h \
+		$(HPT_ROOT)/inc/him.h \
+		$(HPT_ROOT)/inc/himfuncs.h \
+		$(HPT_ROOT)/inc/array.h \
+		$(HPT_ROOT)/inc/list.h \
+		$(HPT_ROOT)/inc/hptintf.h
+
+C_OPTS := -O2 -pipe \
+		-Wunused -Wparentheses -Wuninitialized -Wchar-subscripts \
+		-Wtrigraphs -Wswitch -Wreturn-type -Wimplicit \
+		-Wstrict-prototypes -fomit-frame-pointer
+
+ifeq ($(ARCH), x86_64)
+C_OPTS += -mcmodel=kernel -mno-red-zone
+C_DEFINES += -DBITS_PER_LONG=64
+endif
+
+HPT_LIB := $(HPT_ROOT)/lib/linux/$(if $(DEBUG:1=),free,chk)-$(ARCH)
+
+ifeq ("$(TARGETTYPE)", "LIBRARY")
+include $(HPT_ROOT)/inc/linux/hptlib.mk
+endif
+
+ifeq ("$(TARGETTYPE)", "KMOD")
+
+C_DEFINES += -DMODVERSIONS -DMODULE
+
+#
+# change KERNELDIR according to your system
+#
+ifndef KERNELDIR
+KERNELDIR := /lib/modules/$(shell uname -r)/build
+endif
+
+KERNEL_VER := 2.$(shell expr `grep LINUX_VERSION_CODE $(KERNELDIR)/include/linux/version.h | cut -d\  -f3` / 256 % 256)
+
+ifeq ($(KERNEL_VER),)
+$(error Cannot find kernel version. Check $(KERNELDIR)/include/linux/version.h.)
+endif
+
+ifneq ($(KERNEL_VER), 2.6)
+ifneq ($(KERNEL_VER), 2.4)
+$(error Only kernel 2.4/2.6 is supported but you use $(KERNEL_VER))
+endif
+endif
+
+ifeq ($(KERNEL_VER), 2.6)
+
+TARGET := $(TARGETNAME).ko
+
+$(TARGETNAME).ko: $(CURDIR)/.build/Makefile
+	@$(MAKE) -C $(KERNELDIR) SUBDIRS=$(CURDIR)/.build modules
+	@cp -f $(CURDIR)/.build/$(TARGETNAME).ko $(CURDIR)/
+
+.PHONY: $(CURDIR)/.build/Makefile
+$(CURDIR)/.build/Makefile:
+	@mkdir -p $(CURDIR)/.build
+	@echo '# auto generated makefile' > $@
+	@echo 'HPT_ROOT := $(HPT_ROOT)' >> $@
+	@echo 'HPT_REGPARM := $$(shell echo "$$(CFLAGS) $$(KBUILD_CFLAGS)" | awk '"'"'{ match($$$$0,"-mregparm="); if (RSTART>0) print substr($$$$0,RSTART+10,1);}'"'"')' >> $@
+	@echo 'HPT_REGPARM := $$(if $$(HPT_REGPARM),$$(HPT_REGPARM),0)' >> $@
+	@echo 'HPT_LIB := $(HPT_LIB)-regparm$$(HPT_REGPARM)' >>$@
+	@echo 'TARGETNAME := $(TARGETNAME)' >>$@
+	@echo 'TARGETOBJS := $(TARGETOBJS)' >>$@
+	@echo 'TARGETMODS := $(TARGETMODS)' >>$@
+	@echo >>$@
+	@echo 'obj-m := $$(TARGETNAME).o' >>$@
+	@echo >>$@
+	@echo '$$(TARGETNAME)-objs := $$(TARGETOBJS) $$(TARGETMODS)' >>$@
+	@echo >>$@
+	@echo 'EXTRA_CFLAGS := $(C_DEFINES) -Idrivers/scsi -I$$(HPT_ROOT)/inc/linux -I$$(HPT_ROOT)/inc -I$$(HPT_ROOT)/osm/linux' >>$@
+	@echo >>$@
+	@echo '$$(addprefix $$(obj)/,$$(TARGETOBJS:.o=.c)): FORCE' >>$@
+	@echo '	@{ test -f $(CURDIR)/$$(notdir $$@) && cp -f $(CURDIR)/$$(notdir $$@) $$@; } ||\' >>$@
+	@echo '	{ test -f $$(HPT_ROOT)/osm/linux/$$(notdir $$@) && cp -f $$(HPT_ROOT)/osm/linux/$$(notdir $$@) $$@; }' >>$@
+	@echo >>$@
+	@echo '$$(addprefix $$(obj)/,$$(TARGETMODS)): $$(obj)/%.o: $$(HPT_LIB)/%.o' >>$@
+	@echo '	@cp -f $$< $$@' >>$@
+
+else # for kernel 2.4 modules
+
+HPT_LIB := $(HPT_LIB)-regparm0
+_TARGETMODS := $(addprefix $(HPT_LIB)/,$(TARGETMODS))
+
+VPATH := .. $(HPT_ROOT)/osm/linux
+TARGET := $(TARGETNAME).o
+
+C_INCLUDES += -I$(HPT_ROOT)/osm/linux -I$(KERNELDIR)/include -I$(KERNELDIR)/drivers/scsi
+
+$(TARGET): $(TARGETOBJS) $(_TARGETMODS)
+	@echo $(if $V,,[LD] $@)
+	$(if $V,,@)$(CROSS_COMPILE)$(LD) -r -o $@ $^
+
+endif # KERNEL_VER
+
+endif # KMOD
+
+wrong_target:
+	@echo Wrong or missing TARGETTYPE
+
+CFLAGS := $(C_OPTS) $(C_DEFINES) $(C_INCLUDES)
+
+%.o: %.c $(SHARED_HEADERS)
+	@echo $(if $V,,[CC] $<)
+	$(if $V,,@)$(CROSS_COMPILE)$(CC) $(CFLAGS) -c -o $@ $<
+
+# export variables used by the scripts.
+export HPT_ROOT TARGETNAME TARGETMODS TARGETOBJS KERNELDIR C_DEFINE KERNEL_VER
+
+patchkernel:
+	@sh $(HPT_ROOT)/osm/linux/patch.sh
+
+install: $(TARGET)
+	@sh $(HPT_ROOT)/osm/linux/install.sh
+
+clean::
+	@rm -f $(TARGET) $(TARGETOBJS) *.o *.ko *~ core
+	@rm -rf .build spp update_revision.sh
+	@rm -f $(HPT_ROOT)/osm/linux/*.o
