@@ -8,8 +8,10 @@
 
 /* system headers */
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,0,0))
 #ifndef AUTOCONF_INCLUDED
 #include <linux/config.h>
+#endif
 #endif
 
 #include <linux/version.h>

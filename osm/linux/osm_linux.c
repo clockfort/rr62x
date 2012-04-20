@@ -922,7 +922,7 @@ static void hpt_scsi_start_stop_done(PCOMMAND pCmd)
 	}
 }
 
-static int hpt_queuecommand (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
+static int hpt_queuecommand_lck (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 {
 	struct Scsi_Host *phost = sc_host(SCpnt);
 	PVBUS_EXT vbus_ext = get_vbus_ext(phost);
@@ -1456,6 +1456,11 @@ cmd_done:
 	return 0;
 }
 
+#ifdef DEF_SCSI_QCMD
+DEF_SCSI_QCMD(hpt_queuecommand)
+#else
+#define hpt_queuecommand hpt_queuecommand_lck
+#endif
 static int hpt_reset (Scsi_Cmnd *SCpnt)
 {
 	PVBUS_EXT vbus_ext = get_vbus_ext(sc_host(SCpnt));

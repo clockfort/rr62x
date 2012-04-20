@@ -260,7 +260,7 @@ void refresh_sd_flags(PVBUS_EXT vbus_ext)
 					struct block_device *bdev = bdget(MKDEV(major[i], minor));
 					if (bdev &&
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,28)
-						blkdev_get(bdev, FMODE_READ)
+						blkdev_get(bdev, FMODE_READ, NULL)
 #else 
 						blkdev_get(bdev, FMODE_READ, 0 __BDEV_RAW)
 #endif
