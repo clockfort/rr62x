@@ -1,4 +1,4 @@
-/* $Id: osm_linux.c,v 1.81 2009/12/11 00:41:53 wsw Exp $
+/* $Id: osm_linux.c,v 1.83 2010/05/11 03:09:27 lcn Exp $
  *
  * HighPoint RAID Driver for Linux
  * Copyright (C) 2005 HighPoint Technologies, Inc. All Rights Reserved.
@@ -9,7 +9,7 @@
 MODULE_AUTHOR ("HighPoint Technologies, Inc.");
 MODULE_DESCRIPTION ("RAID driver");
 
-static int autorebuild = 0;
+static int autorebuild = 1; /* 1: autorebuild, 0: not */
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0)
 module_param(autorebuild, int, 0);
 #else 
@@ -114,8 +114,8 @@ static int hpt_alloc_mem(PVBUS_EXT vbus_ext)
 	ldm_get_mem_info((PVBUS)vbus_ext->vbus, 0);
 
 	for (f=vbus_ext->freelist_head; f; f=f->next) {
-		KdPrint(("%s: %d*%d=%d bytes",
-			f->tag, f->count, f->size, f->count*f->size));
+/*		KdPrint(("%s: %d*%d=%d bytes", */
+/*			f->tag, f->count, f->size, f->count*f->size)); */
 		for (i=0; i<f->count; i++) {
 			p = (void **)kmalloc(f->size, GFP_ATOMIC);
 			if (!p) return -1;
@@ -131,8 +131,8 @@ static int hpt_alloc_mem(PVBUS_EXT vbus_ext)
 
 		for (order=0, size=PAGE_SIZE; size<f->size; order++, size<<=1) ;
 
-		KdPrint(("%s: %d*%d=%d bytes, order %d",
-			f->tag, f->count, f->size, f->count*f->size, order));
+/*		KdPrint(("%s: %d*%d=%d bytes, order %d", */
+/*			f->tag, f->count, f->size, f->count*f->size, order)); */
 		HPT_ASSERT(f->alignment<=PAGE_SIZE);
 
 		for (i=0; i<f->count;) {
@@ -174,8 +174,8 @@ static void hpt_free_mem(PVBUS_EXT vbus_ext)
 	for (f=vbus_ext->freelist_head; f; f=f->next) {
 #if DBG
 		if (f->count!=f->reserved_count) {
-			KdPrint(("memory leak for freelist %s (%d/%d)",
-					f->tag, f->count, f->reserved_count));
+/*			KdPrint(("memory leak for freelist %s (%d/%d)", */
+/*					f->tag, f->count, f->reserved_count)); */
 		}
 #endif
 		while ((p=freelist_get(f)))
@@ -192,8 +192,8 @@ static void hpt_free_mem(PVBUS_EXT vbus_ext)
 		int order, size;
 #if DBG
 		if (f->count!=f->reserved_count) {
-			KdPrint(("memory leak for dma freelist %s (%d/%d)",
-					f->tag, f->count, f->reserved_count));
+/*			KdPrint(("memory leak for dma freelist %s (%d/%d)", */
+/*					f->tag, f->count, f->reserved_count)); */
 		}
 #endif
 		for (order=0, size=PAGE_SIZE; size<f->size; order++, size<<=1) ;
@@ -265,50 +265,6 @@ static void ldm_initialize_vbus_done(void *osext)
 	up(&((PVBUS_EXT)osext)->sem);
 }
 
-#ifdef SUPPORT_NVRAM
-#include "wj.h"
-struct rebuild_param {
-	HPT_U32 id;
-	HPT_LBA lba;
-	HPT_U16 sectors;
-}__attribute__((packed));
-
-void __hpt_do_ioctl(PVBUS_EXT vbus_ext, IOCTL_ARG *ioctl_args);
-static void do_init_recovery(PVBUS vbus, PVBUS_EXT vbus_ext)
-{
-	PVDEV vd;
-	void *handle;
-	struct rebuild_param rp;
-	IOCTL_ARG arg;
-
-	/* check journal entries */
-	while ((handle = wj_get_entry(vbus, &vd, &rp.lba, &rp.sectors))) {
-		wj_del_entry(vbus, handle);
-		if (vd) {
-			os_printk("replay_journal: vd %p " "lba " LBA_FORMAT_STR " sz 0x%x",
-				  vd, rp.lba, rp.sectors);
-
-			rp.id = ldm_get_device_id(vd);
-			memset(&arg, 0, sizeof(arg));
-
-			arg.dwIoControlCode = HPT_IOCTL_REBUILD_DATA_BLOCK_V2;
-			arg.lpInBuffer = &rp;
-			arg.nInBufferSize = sizeof(rp);
-			arg.lpOutBuffer = 0;
-			arg.nOutBufferSize = 0;
-			arg.lpBytesReturned = 0;
-			arg.vbus = vbus;
-			__hpt_do_ioctl(vbus_ext, &arg);
-			KdPrint(("replayed journal: %p vd_id %x "
-				 LBA_FORMAT_STR " sectors 0x%x %s",
-				 &arg, rp.id, rp.lba, rp.sectors, 
-				 (HPT_IOCTL_RESULT_OK == arg.result) ? "Successfully" : "Failed"));
-		}
-
-	}
-}
-
-#endif
 
 static int hpt_detect (Scsi_Host_Template *tpnt)
 {
@@ -330,6 +286,8 @@ static int hpt_detect (Scsi_Host_Template *tpnt)
 	for (him = him_list; him; him = him->next) {
 		for (i=0; him->get_supported_device_id(i, &pci_id); i++) {
 			pcidev = 0;
+			if (him->get_controller_count)
+				him->get_controller_count(&pci_id,0,0);
 			while ((pcidev = HPT_FIND_PCI_DEVICE(pci_id.vid,
 							pci_id.did, pcidev))) {
 				hpt_init_one(him, pcidev);
@@ -429,9 +387,6 @@ static int hpt_detect (Scsi_Host_Template *tpnt)
 				pci_write_config_word(hba->pcidev, PCI_COMMAND,
 					pci_command & ~0x400);
 		}
-#ifdef SUPPORT_NVRAM
-		do_init_recovery(vbus, vbus_ext);
-#endif
 	}
 
 	register_reboot_notifier(&hpt_notifier);
@@ -726,7 +681,7 @@ static void os_cmddone(PCOMMAND pCmd)
 	}
 
 	ldm_free_cmds(pCmd);
-	KdPrint(("scsi_done(%p)", SCpnt));
+	KdPrint(("<8>scsi_done(%p)", SCpnt));
 	SCpnt->scsi_done(SCpnt);
 }
 
@@ -917,12 +872,15 @@ static void hpt_scsi_start_stop_done(PCOMMAND pCmd)
 		}
 
 		ldm_free_cmds(pCmd);
-		KdPrint(("scsi_done(%p)", SCpnt));
+		KdPrint(("<8>scsi_done(%p)", SCpnt));
 		SCpnt->scsi_done(SCpnt);
 	}
 }
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)
+static int hpt_queuecommand (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
+#else 
 static int hpt_queuecommand_lck (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
+#endif
 {
 	struct Scsi_Host *phost = sc_host(SCpnt);
 	PVBUS_EXT vbus_ext = get_vbus_ext(phost);
@@ -930,8 +888,8 @@ static int hpt_queuecommand_lck (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	PVDEV     pVDev;
 	PCOMMAND pCmd;
 	HPT_UINT cmds_per_request;
-
-	KdPrint(("hpt_queuecommand(%p) %d/%d/%d/%d cdb=(%x-%x-%x)", SCpnt,
+	
+	KdPrint(("<8>hpt_queuecommand(%p) %d/%d/%d/%d cdb=(%x-%x-%x)", SCpnt,
 		phost->host_no,
 		sc_channel(SCpnt), sc_target(SCpnt), sc_lun(SCpnt),
 		((HPT_U32 *)SCpnt->cmnd)[0], ((HPT_U32 *)SCpnt->cmnd)[1],
@@ -952,7 +910,7 @@ static int hpt_queuecommand_lck (Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	pVDev = ldm_find_target(vbus, sc_target(SCpnt));
 
 	if (pVDev == NULL || pVDev->vf_online == 0) {
-		SCpnt->result = DID_NO_CONNECT;
+		SCpnt->result = (DID_NO_CONNECT << 16);
 		goto cmd_done;
 	}
 
@@ -1424,7 +1382,7 @@ set_sense:
 				pCmd->uCmd.Ide.nSectors <<= pVDev->u.array.sector_size_shift;
 			}
 
-			KdPrint(("SCpnt=%p, pVDev=%p cmd=%x lba=" LBA_FORMAT_STR " nSectors=%d",
+			KdPrint(("<8>SCpnt=%p, pVDev=%p cmd=%x lba=" LBA_FORMAT_STR " nSectors=%d",
 				SCpnt, pVDev, SCpnt->cmnd[0], pCmd->uCmd.Ide.Lba, pCmd->uCmd.Ide.nSectors));
 
 			pCmd->priv = SCpnt;
@@ -1451,16 +1409,15 @@ invalid:
 		break;
 	}
 cmd_done:
-	KdPrint(("scsi_done(%p)", SCpnt));
+	KdPrint(("<8>scsi_done(%p)", SCpnt));
 	SCpnt->scsi_done(SCpnt);
 	return 0;
 }
 
-#ifdef DEF_SCSI_QCMD
-DEF_SCSI_QCMD(hpt_queuecommand)
-#else
-#define hpt_queuecommand hpt_queuecommand_lck
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+static DEF_SCSI_QCMD(hpt_queuecommand)
 #endif
+
 static int hpt_reset (Scsi_Cmnd *SCpnt)
 {
 	PVBUS_EXT vbus_ext = get_vbus_ext(sc_host(SCpnt));

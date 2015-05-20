@@ -1,6 +1,6 @@
 /*
  * $Id: list.h,v 1.6 2006/10/31 06:25:28 gmm Exp $
- * Copyright (C) 2004-2005 HighPoint Technologies, Inc. All rights reserved.
+ * Copyright (C) 2005-2011 HighPoint Technologies, Inc. All rights reserved.
  */
 #ifndef _HPT_LIST_H_
 #define _HPT_LIST_H_

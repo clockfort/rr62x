@@ -1,5 +1,5 @@
 /*
- * $Id: osm.h,v 1.21 2008/03/21 05:42:39 gmm Exp $
+ * $Id: osm.h,v 1.22 2010/05/11 10:32:00 lcn Exp $
  * Copyright (C) 2004-2005 HighPoint Technologies, Inc. All rights reserved.
  */
 #ifndef _HPT_OSM_H_
@@ -99,7 +99,7 @@ void     os_pci_writel(void *osext, HPT_U8 offset, HPT_U32 value);
 #define MAX_PCI_BUS_NUMBER 0xff
 #define MAX_PCI_DEVICE_NUMBER 32
 #define MAX_PCI_FUNC_NUMBER 8
-#define pcicfg_read_dword(bus, dev, fn, reg) 0xffff
+HPT_U32 pcicfg_read_dword(HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg);
 
 
 void *os_map_pci_bar(

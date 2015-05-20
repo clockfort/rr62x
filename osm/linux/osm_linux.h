@@ -1,4 +1,4 @@
-/* $Id: osm_linux.h,v 1.25 2009/07/16 01:15:17 zsf Exp $
+/* $Id: osm_linux.h,v 1.26 2010/05/11 03:09:27 lcn Exp $
  *
  * HighPoint RAID Driver for Linux
  * Copyright (C) 2005 HighPoint Technologies, Inc. All Rights Reserved.
@@ -6,8 +6,15 @@
 #ifndef _OSM_LINUX_H
 #define _OSM_LINUX_H
 
-/* system headers */
 #include <linux/version.h>
+
+/* system headers */
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,38)
+#ifndef AUTOCONF_INCLUDED
+#include <linux/config.h>
+#endif
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)) && defined(MODVERSIONS)
 #include <linux/modversions.h>
@@ -196,6 +203,12 @@ typedef void irqreturn_t;
 #define HPT_SG_PAGE(sg)		sg_page(sg)
 #else 
 #define HPT_SG_PAGE(sg)		(sg)->page
+#endif
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
+#define HPT_FIND_SLOT_DEVICE pci_get_bus_and_slot
+#else 
+#define HPT_FIND_SLOT_DEVICE pci_find_slot
 #endif
 
 struct hpt_scsi_pointer {

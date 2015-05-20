@@ -10,7 +10,7 @@ case ${KERNEL_VER} in
 	OBJ=o
 	MODVER=`modinfo -f%{kernel_version} ${PWD}/${TARGETNAME}.${OBJ}`
 	;;
-	2.6 | 3.0 | 3.1 | 3.2 | 3.3)
+	2.6 | 3.* )
 	OBJ=ko
 	MODVER=`modinfo -F vermagic ${PWD}/${TARGETNAME}.${OBJ} | cut -d' ' -f1`
 	;;
@@ -31,7 +31,9 @@ if test "${MODVER}" = "`uname -r`"; then
 	echo "Install the new driver module..."
 	cp ${PWD}/${TARGETNAME}.${OBJ} /lib/modules/`uname -r`/kernel/drivers/scsi/${TARGETNAME}
 	echo "Removing conflicted driver module..."
-	if [ "${TARGETNAME}" = "hptmv" -o "${TARGETNAME}" = "hptmv6" -o  "${TARGETNAME}" = "rr174x" -o "${TARGETNAME}" = "rr2310_00" -o "${TARGETNAME}" = "rr172x" ] ; then
+	if [ "${TARGETNAME}" = "rr272x_1x" -o "${TARGETNAME}" = "rr274x_3x" -o  "${TARGETNAME}" = "rr276x" -o "${TARGETNAME}" = "rr278x" ] ; then
+		find /lib/modules/`uname -r`/kernel -name mvsas.* -exec rm -f {} \;
+	elif [ "${TARGETNAME}" = "hptmv" -o "${TARGETNAME}" = "hptmv6" -o  "${TARGETNAME}" = "rr174x" -o "${TARGETNAME}" = "rr2310_00" -o "${TARGETNAME}" = "rr172x" ] ; then
 		find /lib/modules/`uname -r`/kernel -name sata_mv.* -exec rm -f {} \;
 	elif [ "$TARGETNAME" = "hpt374" ]; then
 		find /lib/modules/`uname -r`/kernel -name hpt366.* -exec rm -f {} \;
@@ -44,6 +46,9 @@ elif [ -d /lib/modules/${MODVER} ]; then
 	echo "You made a module for ${MODVER} which does not match current kernel."
 	echo "The driver will be installed for kernel ${MODVER}."
 	echo "Deleting previous installed driver module ${TARGETNAME}..."
+	if [ "${TARGETNAME}" = "rr272x_1x" -o "${TARGETNAME}" = "rr274x_3x" -o  "${TARGETNAME}" = "rr276x" -o "${TARGETNAME}" = "rr278x" ] ; then
+		find /lib/modules/${MODVER}/kernel -name mvsas.* -exec rm -f {} \;
+	fi
 	HPTMV6=$( find /lib/modules/${MODVER}/* -name ${TARGETNAME}.${OBJ} )
 	rm -f ${HPTMV6}
 	rm -rf /lib/modules/${MODVER}/kernel/drivers/scsi/${TARGETNAME}
@@ -65,12 +70,12 @@ else
 	exit 1
 fi
 
-MKINITRD=NO
-( which mkinitrd > /dev/null 2> /dev/null ) && MKINITRD=`which mkinitrd`
-( which mkinitramfs > /dev/null 2> /dev/null ) && MKINITRD=`which mkinitramfs`
+MKINITRD=`which mkinitrd 2> /dev/null`
+[ "$MKINITRD" = "" ] && MKINITRD=`which mkinitramfs 2> /dev/null`
+[ "$MKINITRD" = "" ] && MKINITRD=`which dracut 2> /dev/null`
 
-if test "$MKINITRD" = NO ; then
-	echo "Can not find command 'mkinitrd' or 'mkinitramfs'."
+if test "$MKINITRD" = "" ; then
+	echo "Can not find command 'mkinitrd' or 'mkinitramfs' or 'dracut'."
 	exit 1
 fi
 
@@ -104,11 +109,30 @@ fedora | redhat )
 		else
 			rm /boot/initrd-${MODVER}.img
 		fi
+		$MKINITRD /boot/initrd-${MODVER}.img ${MODVER}
+	elif [ -f /boot/initramfs-${MODVER}.img ] ; then
+		if [ ! -f /boot/initramfs-${MODVER}.img.${TARGETNAME} ]; then
+			echo "Backup /boot/initramfs-${MODVER}.img to /boot/initramfs-${MODVER}.img.${TARGETNAME}."
+			mv /boot/initramfs-${MODVER}.img /boot/initramfs-${MODVER}.img.${TARGETNAME}
+		else
+			rm /boot/initramfs-${MODVER}.img
+		fi
+		$MKINITRD /boot/initramfs-${MODVER}.img ${MODVER}
+	else
+		echo "WARNING!!! No initrd image found, skip mkinitrd."
+		sleep 3
 	fi
-	$MKINITRD /boot/initrd-${MODVER}.img ${MODVER}
 ;;
 suse )
- 	if [ -f /boot/initrd-${MODVER} ] ; then
+	if [ -f /etc/modprobe.d/unsupported-modules ]; then
+		echo "Enable loading of unsupported modules."
+		sed -i /^allow_unsupported_modules/s/0/1/g /etc/modprobe.d/unsupported-modules
+	fi
+	if [ -f /etc/sysconfig/hardware/config ]; then
+		echo "Enable loading of unsupported modules."
+		sed -i /^LOAD_UNSUPPORTED_MODULES_AUTOMATICALLY/s/no/yes/g /etc/sysconfig/hardware/config
+	fi
+	if [ -f /boot/initrd-${MODVER} ] ; then
 		if [ ! -f /boot/initrd-${MODVER}.${TARGETNAME} ]; then
 			echo "Backup /boot/initrd-${MODVER} to /boot/initrd-${MODVER}.${TARGETNAME}."
 			mv /boot/initrd-${MODVER} /boot/initrd-${MODVER}.${TARGETNAME}
@@ -123,6 +147,13 @@ debian | ubuntu )
 			mv /boot/initrd.img-${MODVER} /boot/initrd.img-${MODVER}.${TARGETNAME}
 		else
 			rm /boot/initrd.img-${MODVER}
+		fi
+	fi
+	if [ -f /etc/initramfs-tools/initramfs.conf ]; then
+		if grep ^ROOTDELAY -s -q /etc/initramfs-tools/initramfs.conf; then
+			sed -i s"#^ROOTDELAY.*#ROOTDELAY=180#" /etc/initramfs-tools/initramfs.conf
+		else
+			echo "ROOTDELAY=180" >> /etc/initramfs-tools/initramfs.conf
 		fi
 	fi
 	$MKINITRD -o /boot/initrd.img-${MODVER} ${MODVER}

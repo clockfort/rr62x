@@ -191,6 +191,9 @@ Copyright (C) 2008-2009 HighPoint Technologies, Inc. All rights reserved.
 4. Revision History
 #############################################################################
 
+   v1.2.12.0601  06/01/2012
+     * Support Linux kernel up to 3.0.
+
    v1.1.09.1221  12/21/2009
      * Support NCQ
 
