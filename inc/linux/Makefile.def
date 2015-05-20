@@ -74,18 +74,26 @@ ifndef KERNELDIR
 KERNELDIR := /lib/modules/$(shell uname -r)/build
 endif
 
-MAJOR := $(shell expr `grep LINUX_VERSION_CODE $(KERNELDIR)/include/linux/version.h | cut -d\  -f3` / 65536 % 65536)
-MINOR := $(shell expr `grep LINUX_VERSION_CODE $(KERNELDIR)/include/linux/version.h | cut -d\  -f3` / 256 % 256)
-KERNEL_VER := $(MAJOR).$(MINOR)
+ifneq (,$(wildcard $(KERNELDIR)/include/linux/version.h))
+  MAJOR := $(shell expr `grep LINUX_VERSION_CODE $(KERNELDIR)/include/linux/version.h | cut -d\  -f3` / 65536 % 65536)
+  MINOR := $(shell expr `grep LINUX_VERSION_CODE $(KERNELDIR)/include/linux/version.h | cut -d\  -f3` / 256 % 256)
+  KERNEL_VER := $(MAJOR).$(MINOR)
+else
+  KERNEL_VER := $(shell cd $(KERNELDIR) ; make kernelversion | cut -d. -f1,2)
+  MAJOR := $(firstword $(subst ., ,$(KERNEL_VER)))
+  MINOR := $(word 2,$(subst ., ,$(KERNEL_VER)))
+endif
 
 ifeq ($(KERNEL_VER),)
 $(error Cannot find kernel version. Check $(KERNELDIR)/include/linux/version.h.)
 endif
 
+ifneq ($(MAJOR), 4)
 ifneq ($(MAJOR), 3)
 ifneq ($(KERNEL_VER), 2.6)
 ifneq ($(KERNEL_VER), 2.4)
-$(error Only kernel 2.4/2.6/3.x is supported but you use $(KERNEL_VER))
+$(error Only kernel 2.4/2.6/3.x/4.x is supported but you use $(KERNEL_VER))
+endif
 endif
 endif
 endif

@@ -449,7 +449,11 @@ static int scsicmd_buf_get(Scsi_Cmnd *cmd, void **pbuf)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
 	struct scatterlist *sg;
 	sg = scsi_sglist(cmd);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+	*pbuf = kmap_atomic(HPT_SG_PAGE(sg)) + sg->offset;
+#else 
 	*pbuf = kmap_atomic(HPT_SG_PAGE(sg), HPT_KMAP_TYPE) + sg->offset;
+#endif
 	buflen = sg->length;
 #else 
 
@@ -479,7 +483,11 @@ static inline void scsicmd_buf_put(struct scsi_cmnd *cmd, void *buf)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,23)
 	struct scatterlist *sg;
 	sg = scsi_sglist(cmd);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
+	kunmap_atomic((char *)buf - sg->offset);
+#else 
 	kunmap_atomic((char *)buf - sg->offset, HPT_KMAP_TYPE);
+#endif
 #else 
 
 	if (cmd->use_sg) {
@@ -1706,6 +1714,7 @@ void hpt_do_ioctl(IOCTL_ARG *ioctl_args)
 	}
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
 static int hpt_proc_set_info(struct Scsi_Host *host, char *buffer, int length)
 {
 	IOCTL_ARG ioctl_args;
@@ -1808,6 +1817,7 @@ static int hpt_proc_info26(struct Scsi_Host *host, char *buffer, char **start,
 	else
 		return hpt_proc_get_info(host, buffer, start, offset, length);
 }
+#endif
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 static int hpt_proc_info24(char *buffer,char **start, off_t offset,
@@ -2108,7 +2118,9 @@ static Scsi_Host_Template driver_template = {
 	#endif
 #else /* 2.6.x */
 	proc_name:               driver_name,
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)
 	proc_info:               hpt_proc_info26,
+#endif
 	max_sectors:             128,
 #endif
 	this_id:                 -1

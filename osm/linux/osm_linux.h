@@ -176,7 +176,9 @@ typedef void irqreturn_t;
 #endif
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)
 #define HPT_KMAP_TYPE KM_BIO_SRC_IRQ
+#endif
 #define HPT_FIND_PCI_DEVICE pci_get_device
 #else 
 #define HPT_KMAP_TYPE KM_BH_IRQ
