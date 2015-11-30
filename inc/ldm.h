@@ -1,6 +1,6 @@
 /*
- * $Id: ldm.h,v 1.77 2009/01/19 09:36:46 gmm Exp $
- * Copyright (C) 2004-2005 HighPoint Technologies, Inc. All rights reserved.
+ * $Id: ldm.h,v 1.78 2010/05/10 10:08:46 lcn Exp $
+ * Copyright (C) 2005-2011 HighPoint Technologies, Inc. All rights reserved.
  */
 #ifndef _HPT_LDM_H_
 #define _HPT_LDM_H_
@@ -25,7 +25,10 @@ extern "C" {
 #define HPT_INTERFACE_VERSION 0x02010000
 #endif
 
+#ifndef MAX_PARTITIONS_PER_DISK
 #define MAX_PARTITIONS_PER_DISK	4
+#endif
+
 #if defined(__MAX_PARTITIONS_PER_DISK) && MAX_PARTITIONS_PER_DISK > __MAX_PARTITIONS_PER_DISK
 #error "Please redefine MAX_PARTITIONS_PER_DISK!!!"
 #endif

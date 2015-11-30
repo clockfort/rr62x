@@ -1,5 +1,5 @@
 /*
- * $Id: him.h,v 1.55 2009/12/08 06:58:19 mah Exp $
+ * $Id: him.h,v 1.57 2011/02/21 06:03:21 zsf Exp $
  * Copyright (C) 2004-2005 HighPoint Technologies, Inc. All rights reserved.
  */
 #ifndef _HPT_HIM_H_
@@ -66,7 +66,8 @@ typedef struct _HIM_ADAPTER_CONFIG
 	HPT_U8  szProductID[36];
 	HPT_U32 nvramSize;
 	HPT_U64 nvramAddress;
-	HPT_U8  reserved2[12];
+	HPT_U8  slot_index;
+	HPT_U8  reserved2[11];
 }
 HIM_ADAPTER_CONFIG, *PHIM_ADAPTER_CONFIG;
 
@@ -96,6 +97,7 @@ typedef struct _HIM_DEVICE_FLAGS
 	HPT_UINT df_ncq_enabled         :1;
 	HPT_UINT df_sas                 :1;
 	HPT_UINT df_in_enclosure        :1;
+	HPT_UINT df_ssd                 :1;
 } DEVICE_FLAGS, *PDEVICE_FLAGS;
 
 #pragma pack(1)
@@ -183,6 +185,8 @@ typedef struct _HIM_DEVICE_CONFIG
 
 	PIDENTIFY_DATA pIdentifyData;
 
+
+	HPT_U8  fixed_path_id; /*equals to phy id */
 }
 HIM_DEVICE_CONFIG, *PHIM_DEVICE_CONFIG;
 

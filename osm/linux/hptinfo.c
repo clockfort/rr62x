@@ -211,6 +211,7 @@ static void hpt_dump_devinfo(HPT_GET_INFO *pinfo, DEVICEID id, int indent)
 			devinfo.u.array.ArrayType==AT_RAID0? "RAID0" :
 				devinfo.u.array.ArrayType==AT_RAID1? "RAID1" :
 				devinfo.u.array.ArrayType==AT_RAID5? "RAID5" :
+				devinfo.u.array.ArrayType==AT_RAID6? "RAID6" :
 				devinfo.u.array.ArrayType==AT_JBOD? "JBOD" : "unknown",
 			(int)(devinfo.Capacity*512/1000000),
 			get_array_status(&devinfo)

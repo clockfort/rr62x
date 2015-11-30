@@ -1,11 +1,11 @@
 /*
- * $Id: array.h,v 1.45 2008/01/24 11:22:16 gmm Exp $
- * Copyright (C) 2004-2005 HighPoint Technologies, Inc. All rights reserved.
+ * $Id: array.h,v 1.46 2010/02/05 06:57:43 mah Exp $
+ * Copyright (C) 2004-2011 HighPoint Technologies, Inc. All rights reserved.
  */
 #ifndef _HPT_ARRAY_H_
 #define _HPT_ARRAY_H_
 
-#define VERMAGIC_ARRAY 43
+#define VERMAGIC_ARRAY 46
 
 #if defined(__cplusplus)
 extern "C" {
@@ -89,6 +89,7 @@ typedef struct hpt_array
 {
 	HPT_U32 array_stamp;
 	HPT_U32 data_stamp;  
+	HPT_U32 array_sn; 
 
 	HPT_U8  ndisk;
 	HPT_U8  block_size_shift;

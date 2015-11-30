@@ -1,4 +1,4 @@
-/* $Id: os_linux.c,v 1.33 2009/02/18 01:26:29 zsf Exp $
+/* $Id: os_linux.c,v 1.36 2010/06/01 01:42:36 lcn Exp $
  *
  * HighPoint RAID Driver for Linux
  * Copyright (C) 2005 HighPoint Technologies, Inc. All Rights Reserved.
@@ -78,7 +78,7 @@ void os_stallexec(HPT_U32 microseconds)
 		microseconds -= 1000;
 	}
 	udelay(microseconds);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0) && defined(__x86_64__)
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0) && defined(__x86_64__)) || (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,18))
 	touch_nmi_watchdog();
 #endif
 }
@@ -191,6 +191,11 @@ void freelist_put_dma(struct freelist *list, void *p, BUS_ADDRESS busaddr)
 	list->head = p;
 }
 
+BUS_ADDRESS get_dmapool_phy_addr(void *osext, void * dmapool_virt_addr)
+{
+	return (BUS_ADDRESS)virt_to_bus(dmapool_virt_addr);
+}
+
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,18)) && defined(CONFIG_HIGHMEM)
 void *os_kmap_sgptr(PSG psg)
 {
@@ -213,6 +218,90 @@ void os_kunmap_sgptr(void *ptr)
 #else 
 void *os_kmap_sgptr(PSG psg) { return psg->addr._logical; }
 void os_kunmap_sgptr(void *ptr) {}
+#endif
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+/* PCI space access */
+HPT_U8 pcicfg_read_byte (HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg)
+{
+	HPT_U8 v;
+	if (pcibios_read_config_byte(bus, (dev<<3)|func, reg, &v)) return 0xff;
+	return v;
+}
+HPT_U16 pcicfg_read_word(HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg)
+{
+	HPT_U16 v;
+	if (pcibios_read_config_word(bus, (dev<<3)|func, reg, &v)) return 0xffff;
+	return v;
+}
+HPT_U32 pcicfg_read_dword(HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg)
+{
+	HPT_U32 v;
+	if (pcibios_read_config_dword(bus, (dev<<3)|func, reg, (unsigned int *)&v)) return 0xffffffff;
+	return v;
+}
+void pcicfg_write_byte (HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg, HPT_U8 v)
+{
+	pcibios_write_config_byte(bus, (dev<<3)|func, reg, v);
+}
+void pcicfg_write_word(HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg, HPT_U16 v)
+{
+	pcibios_write_config_word(bus, (dev<<3)|func, reg, v);
+}
+void pcicfg_write_dword(HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg, HPT_U32 v)
+{
+	pcibios_write_config_dword(bus, (dev<<3)|func, reg, v);
+}
+#else /* 2.6.x */
+HPT_U8 pcicfg_read_byte (HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg)
+{
+	HPT_U8 v;
+	struct pci_dev *pPciDev = HPT_FIND_SLOT_DEVICE(bus, PCI_DEVFN(dev,func));
+	if (pPciDev == NULL)
+		return 0xff;
+	if (pci_read_config_byte(pPciDev, reg, &v)) return 0xff;
+	return v;
+}
+HPT_U16 pcicfg_read_word(HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg)
+{
+	HPT_U16 v;
+	struct pci_dev *pPciDev = HPT_FIND_SLOT_DEVICE(bus, PCI_DEVFN(dev,func));
+	if (pPciDev == NULL)
+		return 0xffff;
+	if (pci_read_config_word(pPciDev, reg, &v)) return 0xffff;
+	return v;
+}
+HPT_U32 pcicfg_read_dword(HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg)
+{
+	HPT_U32 v;
+	struct pci_dev *pPciDev = HPT_FIND_SLOT_DEVICE(bus, PCI_DEVFN(dev,func));
+	if (pPciDev == NULL)
+		return 0xffffffff;
+	if (pci_read_config_dword(pPciDev, reg, (unsigned int *)&v)) return 0xffffffff;
+	return v;
+}
+
+void pcicfg_write_byte(HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg, HPT_U8 v)
+{
+	struct pci_dev *pPciDev = HPT_FIND_SLOT_DEVICE(bus, PCI_DEVFN(dev,func));
+	if (pPciDev == NULL)
+		return ;
+	pci_write_config_byte(pPciDev,reg, v);
+}
+void pcicfg_write_word(HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg, HPT_U16 v)
+{
+	struct pci_dev *pPciDev = HPT_FIND_SLOT_DEVICE(bus, PCI_DEVFN(dev,func));
+	if (pPciDev == NULL)
+		return ;
+	pci_write_config_word(pPciDev,reg, v);
+}
+void pcicfg_write_dword(HPT_U8 bus, HPT_U8 dev, HPT_U8 func, HPT_U8 reg, HPT_U32 v)
+{
+	struct pci_dev *pPciDev = HPT_FIND_SLOT_DEVICE(bus, PCI_DEVFN(dev,func));
+	if (pPciDev == NULL)
+		return ;
+	pci_write_config_dword(pPciDev,reg, v);
+}
 #endif
 
 HPT_U64 CPU_TO_LE64(HPT_U64 x) { return cpu_to_le64(x); }
@@ -259,8 +348,10 @@ void refresh_sd_flags(PVBUS_EXT vbus_ext)
 				for (minor=0; minor<=240; minor+=16) {
 					struct block_device *bdev = bdget(MKDEV(major[i], minor));
 					if (bdev &&
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,28)
-						blkdev_get(bdev, FMODE_READ, NULL)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,38)
+						blkdev_get(bdev, FMODE_READ,NULL)
+#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,28)
+						blkdev_get(bdev, FMODE_READ)
 #else 
 						blkdev_get(bdev, FMODE_READ, 0 __BDEV_RAW)
 #endif
@@ -586,7 +677,7 @@ void os_check_stack(const char *location, int size)
 #endif
 }
 
-int hpt_dbg_level = 1;
+int hpt_dbg_level = 7;
 #if defined(MODULE)
 #if LINUX_VERSION_CODE >KERNEL_VERSION(2, 5, 0)
 module_param(hpt_dbg_level, uint, 0);

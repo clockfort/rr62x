@@ -130,6 +130,9 @@ typedef HPT_U32 DEVICEID;
 #define ARRAY_FLAG_NEEDINITIALIZING 0x00001000 /* the array's initialization hasn't finished*/
 #define ARRAY_FLAG_BROKEN_REDUNDANT 0x00002000 /* broken but redundant (raid6) */
 #define ARRAY_FLAG_RAID15PLUS       0x80000000 /* display this RAID 1 as RAID 1.5 */
+
+#define ARRAY_FLAG_ZERO_STARTING    0x40000000 /* start lba of all members of this array is 0 */
+
 /*
  * device flags
  */
@@ -145,6 +148,12 @@ typedef HPT_U32 DEVICEID;
 #define DEVICE_FLAG_LEGACY          0x00020000 /* single disk & mbr contains at least one partition */
 
 #define DEVICE_FLAG_IS_SPARE        0x80000000 /* is a spare disk */
+
+
+#define DEVICE_FLAG_SSD             0x00000100 /* SSD device */
+#define DEVICE_FLAG_3G              0x10000000
+#define DEVICE_FLAG_6G              0x20000000
+
 
 /*
  * array states used by hpt_set_array_state()
@@ -260,6 +269,9 @@ typedef HPT_U32 DEVICEID;
 #define HPT_IOCTL_SET_PERFMON_STATUS        HPT_CTL_CODE(64)
 #define HPT_IOCTL_GET_PERFMON_DATA          HPT_CTL_CODE(65)
 #define HPT_IOCTL_IDE_PASS_THROUGH_V2       HPT_CTL_CODE(66)
+#define HPT_IOCTL_GET_ENCLOSURE_INFO_V2     HPT_CTL_CODE(67)
+#define HPT_IOCTL_GET_ENCLOSURE_INFO_V3     HPT_CTL_CODE(68)
+#define HPT_IOCTL_ACCESS_CONFIG_REG         HPT_CTL_CODE(69)
 
 
 #define HPT_IOCTL_GET_CONTROLLER_IDS        HPT_CTL_CODE(100)
@@ -267,6 +279,13 @@ typedef HPT_U32 DEVICEID;
 
 #define HPT_IOCTL_EPROM_IO                  HPT_CTL_CODE(102)
 #define HPT_IOCTL_GET_CONTROLLER_VENID      HPT_CTL_CODE(103)
+
+
+#define HPT_IOCTL_GET_DRIVER_CAPABILITIES_CC   HPT_CTL_CODE(200)
+#define HPT_IOCTL_GET_CCS_INFO                 HPT_CTL_CODE(201)
+#define HPT_IOCTL_CREATE_CC                    HPT_CTL_CODE(202)
+#define HPT_IOCTL_DELETE_CC                    HPT_CTL_CODE(203)
+#define HPT_IOCTL_REENABLE_ARRAY               HPT_CTL_CODE(204)
 
 /************************************************************************
  * shared data structures
@@ -356,7 +375,8 @@ DRIVER_CAPABILITIES, *PDRIVER_CAPABILITIES;
 typedef struct _DRIVER_CAPABILITIES_V2 {
 	DRIVER_CAPABILITIES v1;
 	HPT_U8 SupportedCachePolicies[16];
-	HPT_U32 reserved[17];
+	HPT_U32 ConfigRegSize; /* max sectors */
+	HPT_U32 reserved[16];
 }
 DRIVER_CAPABILITIES_V2, *PDRIVER_CAPABILITIES_V2;
 
@@ -490,6 +510,82 @@ typedef struct _ENCLOSURE_INFO {
 	HPT_U32 PortPhyMap;
 	HPT_U32 reserve[55];
 } ENCLOSURE_INFO, *PENCLOSURE_INFO;
+
+
+typedef struct _SES_ELEMENT_STATUS {
+	HPT_U8   ElementType;
+	HPT_U8   ElementOverallIndex;
+	HPT_U8   ElementStatus;
+	HPT_U8   Reserved;
+	HPT_U32 ElementValue;
+	HPT_U8   ElementDescriptor[32];
+}SES_ELEMENT_STATUS,*PSES_ELEMENT_STATUS;
+
+#define MAX_ELEMENT_COUNT  80
+/* Element Type */
+#define SES_TYPE_UNSPECIFIED         0x00
+#define SES_TYPE_DEVICE              0x01
+#define SES_TYPE_POWER_SUPPLY        0x02
+#define SES_TYPE_FAN                 0x03
+#define SES_TYPE_TEMPERATURE_SENSOR  0x04
+#define SES_TYPE_DOOR_LOCK           0x05
+#define SES_TYPE_SPEAKER             0x06
+#define SES_TYPE_ES_CONTROLLER       0x07
+#define SES_TYPE_SCC_CONTROLLER      0x08
+#define SES_TYPE_NONVOLATILE_CACHE   0x09
+#define SES_TYPE_UPS                 0x0B
+#define SES_TYPE_DISPLAY             0x0C
+#define SES_TYPE_KEYPAD              0x0D
+#define SES_TYPE_ENCLOSURE           0x0E
+#define SES_TYPE_SCSI_TRANSCEIVER    0x0F
+#define SES_TYPE_LANGUAGE            0x10
+#define SES_TYPE_COMM_PORT           0x11
+#define SES_TYPE_VOLTAGE_SENSOR      0x12
+#define SES_TYPE_CURRENT_SENSOR      0x13
+#define SES_TYPE_SCSI_TARGET_PORT    0x14
+#define SES_TYPE_SCSI_INITIATOR_PORT 0x15
+#define SES_TYPE_SIMPLE_SUBENCLOSURE 0x16
+#define SES_TYPE_ARRAY_DEVICE        0x17
+#define SES_TYPE_VENDOR_SPECIFIC     0x80
+
+/* Element Status */
+
+#define	SES_STATUS_UNSUPPORTED   		0x00
+#define	SES_STATUS_OK					0x01
+#define	SES_STATUS_CRITICAL			0x02
+#define	SES_STATUS_NONCRITICAL 		0x03
+#define	SES_STATUS_UNRECOVERABLE	0x04
+#define	SES_STATUS_NOTINSTALLED		0x05
+#define	SES_STATUS_UNKNOWN			0x06
+#define	SES_STATUS_NOTAVAILABLE		0x06
+#define	SES_STATUS_RESERVED			0x07
+
+
+typedef struct _ENCLOSURE_INFO_V2 {
+	HPT_U8  EnclosureType;
+	HPT_U8  NumberOfPhys;
+	HPT_U8  AttachedTo; 
+	HPT_U8  Status;
+	HPT_U8  VendorId[8];
+	HPT_U8  ProductId[16];
+	HPT_U8  ProductRevisionLevel[4];
+	HPT_U32 PortPhyMap;
+	SES_ELEMENT_STATUS ElementStatus[MAX_ELEMENT_COUNT];
+} ENCLOSURE_INFO_V2, *PENCLOSURE_INFO_V2;
+
+typedef struct _ENCLOSURE_INFO_V3 {
+	HPT_U8  EnclosureType;
+	HPT_U8  NumberOfPhys;
+	HPT_U8  AttachedTo; 
+	HPT_U8  Status;
+	HPT_U8  VendorId[8];
+	HPT_U8  ProductId[16];
+	HPT_U8  ProductRevisionLevel[4];
+	HPT_U32 PortPhyMap;
+	HPT_U32	UnitId;	/*272x card has two Cores, unitId is used to distinguish them */
+	HPT_U32 reserved[32];
+	SES_ELEMENT_STATUS ElementStatus[MAX_ELEMENT_COUNT];
+} ENCLOSURE_INFO_V3, *PENCLOSURE_INFO_V3;
 
 #define ENCLOSURE_STATUS_OFFLINE 1
 
@@ -1254,6 +1350,18 @@ typedef struct _HPT_PM_IOSTAT {
 }
 HPT_PM_IOSTAT, *PHPT_PM_IOSTAT;
 
+/*
+ * disk config region
+ */
+typedef struct _ACCESS_CONFIG_REG {
+	DEVICEID  id;
+	HPT_U16   start;
+	HPT_U8    sectors;
+	HPT_U8    read;
+	HPT_U32   Reserved;
+	#define ACCESS_CONFIG_REG_buffer(p) ((HPT_U8 *)(p) + sizeof(ACCESS_CONFIG_REG_PARAMS))
+} __attribute__((packed))ACCESS_CONFIG_REG_PARAMS, *PACCESS_CONFIG_REG_PARAMS;
+
 
 
 /*
@@ -1981,6 +2089,10 @@ int hpt_get_enclosure_count(int ctlr_id);
  */
 int hpt_get_enclosure_info(int ctlr_id, int enc_id, PENCLOSURE_INFO pInfo);
 
+int hpt_get_enclosure_info_v2(int ctlr_id, int enc_id, PENCLOSURE_INFO_V2 pInfo);
+
+int hpt_get_enclosure_info_v3(int ctlr_id, int enc_id, PENCLOSURE_INFO_V3 pInfo);
+
 /* performance monitor interface
  * Version compatibility: v2.1.0.0 or later
  */
@@ -1992,6 +2104,15 @@ int hpt_get_perfmon_data(DEVICEID id, PHPT_PM_IOSTAT iostat);
  * Version compatibility: v1.0.0.0 or later
  */
 int hpt_get_controller_venid(int ctlr_id, HPT_U32 *venid);
+
+/* hpt_access_config_reg
+ *  access the reserved config space on disk
+ * Parameters:
+ *   p - ACCESS_CONFIG_REG_PARAMS header pointer
+ * Returns:
+ *   0  Success
+ */
+int hpt_access_config_reg(PACCESS_CONFIG_REG_PARAMS p);
 
 #endif
 

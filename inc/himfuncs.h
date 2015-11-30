@@ -1,5 +1,5 @@
-/* $Id: himfuncs.h,v 1.15 2008/05/27 06:32:46 gmm Exp $
- * Copyright (C) 2004-2005 HighPoint Technologies, Inc. All rights reserved.
+/* $Id: himfuncs.h,v 1.17 2010/05/10 10:10:02 lcn Exp $
+ * Copyright (C) 2005-2011 HighPoint Technologies, Inc. All rights reserved.
  *
  * define _HIM_INTERFACE before include this file, and
  * undef it after include this file.
@@ -12,7 +12,7 @@
 
 _HIM_INTERFACE(HPT_BOOL, get_supported_device_id, (int index, PCI_ID *id))
 
-_HIM_INTERFACE(HPT_U8, get_controller_count, (PCI_ID *id, HPT_U8 *reached))
+_HIM_INTERFACE(HPT_U8, get_controller_count, (PCI_ID *id, HPT_U8 *reached, PCI_ADDRESS *addr))
 
 
 _HIM_INTERFACE(HPT_UINT, get_adapter_size, (const PCI_ID *id))
@@ -72,7 +72,8 @@ _HIM_INTERFACE(void, ioctl, (void * adapter, struct _IOCTL_ARG *arg))
 _HIM_INTERFACE(int, compare_slot_seq, (void *adapter1, void *adapter2))
 _HIM_INTERFACE(int, get_enclosure_count, (void *adapter))
 _HIM_INTERFACE(int, get_enclosure_info, (void *adapter, int id, void *pinfo))
-
+_HIM_INTERFACE(int, get_enclosure_info_v2, (void *adapter, int id, void *pinfo))
+_HIM_INTERFACE(int, get_enclosure_info_v3, (void *adapter, int id, void *pinfo))
 
 _HIM_INTERFACE(HPT_BOOL, flash_access, (void *adapter, HPT_U32 offset, void *value, int size, HPT_BOOL reading))
 
