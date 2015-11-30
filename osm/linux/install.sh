@@ -10,7 +10,7 @@ case ${KERNEL_VER} in
 	OBJ=o
 	MODVER=`modinfo -f%{kernel_version} ${PWD}/${TARGETNAME}.${OBJ}`
 	;;
-	2.6 | 3.* )
+	2.6 | 3.* | 4.* )
 	OBJ=ko
 	MODVER=`modinfo -F vermagic ${PWD}/${TARGETNAME}.${OBJ} | cut -d' ' -f1`
 	;;
