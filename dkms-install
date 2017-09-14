@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+ME=$(readlink -f $0)
+HERE=${ME%/*}
+PRODUCT="rr62x"
+PVERSION="1.2"
+PTARGET="/usr/src/${PRODUCT}-${PVERSION}"
+
+die() {
+    2> echo "$@"
+    exit
+}
+
+[ -d "$HERE" ]              || die "Error: can't figure out where we are"
+[ -f "${HERE}/dkms.conf" ]  || die "Error: can't find dkms.conf"
+[ $(id -u) -eq 0 ]          || die "Error: must be run as root, try sudo ${ME}"
+cd ${HERE}                  || die "Error: couldn't cd to project root"
+mkdir -p "${PTARGET}"       || die "Error: couldn't create dkms source directory ${PTARGET}"
+cp -R . "${PTARGET}"        || die "Error: couldn't copy driver source to ${PTARGET}"
+dkms add -m ${PRODUCT} -v ${PVERSION}      || die "Error: dkms add failed"
+dkms build -m ${PRODUCT} -v ${PVERSION}    || die "Error: dkms build failed"
+dkms install -m ${PRODUCT} -v ${PVERSION}  || die "Error: dkms install failed"
+modprobe ${PRODUCT}         || die "Error: modprobe failed to load ${PRODUCT}"
